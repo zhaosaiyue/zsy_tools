@@ -1,0 +1,95 @@
+{
+  "env": {
+    "ANTHROPIC_FOUNDRY_BASE_URL": "https://next.ke.com/api/plugin/lite-llm",
+    "OTEL_LOGS_EXPORT_INTERVAL": "30000",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-4.6-sonnet",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-4.6-sonnet",
+    "OTEL_METRIC_EXPORT_INTERVAL": "60000",
+    "ANTHROPIC_FOUNDRY_API_KEY": "sk-1234",
+    "OTEL_LOGS_EXPORTER": "otlp",
+    "OTEL_EXPORTER_OTLP_HEADERS": "email-prefix=zhaosaiyue001,keones-token=xLfEokHiNy,app-key=A-TOKEN-KEY-zhaosaiyue001,akcode=ak-781aceef-48e7-4d21-96e7-26ee03b59916",
+    "ANTHROPIC_CUSTOM_HEADERS": "email-prefix: zhaosaiyue001\nkeones-token: xLfEokHiNy\napp-key: A-TOKEN-KEY-zhaosaiyue001\nakcode: ak-781aceef-48e7-4d21-96e7-26ee03b59916",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "0",
+    "ANTHROPIC_AUTH_TOKEN": "b96bd99d-c7d1-4ef8-a245-e8ce28c68fe5",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "ANTHROPIC_MODEL": "claude-4.6-sonnet",
+    "OTEL_LOG_USER_PROMPTS": "1",
+    "CLAUDE_CODE_SKIP_FOUNDRY_AUTH": "1",
+    "ANTHROPIC_BASE_URL": "https://openapi-ait.ke.com",
+    "API_TIMEOUT_MS": "100000",
+    "CLAUDE_CODE_USE_FOUNDRY": "1",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "https://next.ke.com/api/plugin/telemetry",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-4.5-haiku",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-4.5-haiku",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-4.5-haiku",
+    "ENABLE_TOOL_SEARCH": "false"
+  },
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf /)",          // 绝对禁止根目录递归删除
+      "Bash(rm -rf *)",           // 禁止当前目录一键清空
+      "Bash(rm -rf .git*)",       // 保护 Git 仓库元数据
+      "Bash(rm -rf src*)",        // 保护源代码目录
+      "Bash(rm -rf tests*)",      // 保护测试用例目录
+      "Bash(rm -rf **/*.py)"      // 禁止 AI 批量删除 Python 脚本
+      "Bash(curl:*)",
+      "Bash(sudo:*)",
+      "Bash(chmod 777 :*)",
+      "Read(*.lock)",
+      "Grep(*.lock)",
+      "Edit(*.lock)",
+      "Read(**/*application-dev.yml)",
+      "Read(**/*application-prod.yml)",
+      "Read(**/*application-test.yml)",
+      "Read(**/*application-preview.yml)",
+      "Grep(**/*application-dev.yml)",
+      "Grep(**/*application-prod.yml)",
+      "Grep(**/*application-test.yml)",
+      "Grep(**/*application-preview.yml)",
+      "Read(**/*application-dev.properties)",
+      "Read(**/*application-prod.properties)",
+      "Read(**/*application-test.properties)",
+      "Read(**/*application-preview.properties)",
+      "Grep(**/*application-dev.properties)",
+      "Grep(**/*application-prod.properties)",
+      "Grep(**/*application-test.properties)",
+      "Grep(**/*application-preview.properties)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Grep(**/.env)",
+      "Grep(**/.env*)"
+    ],"allow": [
+      "Bash(ls*)",      // 允许查看目录
+      "Bash(cd*)",      // 允许切换目录
+      "Bash(pwd*)",     // 允许查看当前路径
+      "Bash(cat*)",     // 允许读取文件内容
+      "Bash(grep*)",    // 允许文本搜索
+      "Bash(find*)",    // 允许查找文件
+      "Bash(git status*)", // 允许查看 Git 状态
+      "Bash(git diff*)",   // 允许查看代码差异
+      "Bash(python --version*)", // 允许检查环境
+      "Bash(pip list*)"    // 允许查看已安装的 Python 包
+    ]
+  },
+  "model": "claude-4.6-sonnet",
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": false,
+    "code-review@claude-plugins-official": false,
+    "jdtls-lsp@claude-plugins-official": false,
+    "pyright-lsp@claude-plugins-official": false,
+    "sign-perf@sign-ai-plugin-marketplace": false,
+    "skill-creator@claude-plugins-official": false,
+    "commit-commands@claude-plugins-official": false,
+    "github@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "sign-ai-plugin-marketplace": {
+      "source": {
+        "source": "git",
+        "url": "https://git.lianjia.com/breeze/sign-ai-plugin.git"
+      }
+    }
+  },
+  "alwaysThinkingEnabled": false
+}
