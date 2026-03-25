@@ -1,5 +1,43 @@
 {
-  "code": 2000,
-  "message": "操作成功",
-  "success": true
+  "bizType": "1",
+  "branchCompany": "B00001",
+  "contractData": {
+    "p_0": 1000000.0,
+    "p_17": 18,
+    "p_1": 18,
+    "p_15": 18
+  },
+  "contractId": 60000038245,
+  "contractNo": "000000048230",
+  "contractOrderId": 3000042218,
+  "contractStatus": 0,
+  "contractType": 1,
+  "customerNo": 501400919039,
+  "districtCode": "120000",
+  "financeDataStatus": 1,
+  "houseNo": 101311402337,
+  "itemValueDtoList": [
+    {
+      "contractValue": {
+        "v_seller": 13001.0,
+        "v_buyer": 12002.0
+      },
+      "itemCode": "42",
+      "itemType": "1"
+    },
+    {
+      "contractValue": {
+        "v_buyer": 4000.0
+      },
+      "itemCode": "",
+      "itemType": "3"
+    }
+  ],
+  "loginId": 1000000020189149,
+  "orderNo": "6464330229800935424",
+  "signCommissioner": -1,
+  "signOrgId": "B10007171",
+  "signUserId": 1000000020189149,
+  "tradeProduct": "18",
+  "versionTime": 1773824524000
 }
