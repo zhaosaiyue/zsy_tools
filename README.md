@@ -1,74 +1,43 @@
 # zsy_tools
 
-一个实用的开发工具集合，包含多个独立的小工具，用于处理日常开发任务。
+一个面向日常开发的工具集合，分为两大类：**技能（Skills）**（Claude Code 智能助手技能）和 **工具（Tools）**（独立 Python 工具）。
 
-## 项目结构
+## 架构概览
 
 ```
 zsy_tools/
-├── README.md
-├── .gitignore
-├── skills/
-│   └── ai-testcase/
+├── README.md                        # 本文件：项目总览
+├── skills/                          # Claude Code Skills（AI 辅助技能）
+│   ├── README.md                    # Skills 目录说明
+│   ├── ai-testcase/                 # AI 测试用例生成器
+│   │   ├── README.md
+│   │   └── SKILL.md                 # Skill 定义文件
+│   └── naming-convention/           # 命名规范审查器
+│       ├── README.md
 │       └── SKILL.md
-└── tools/
-    ├── .gitignore
-    ├── json_tool/
-    │   ├── json_tool.py
-    │   ├── json_data
-    │   └── json_result
-    └── timestamp_converter.py
+└── tools/                           # 独立 Python 工具
+    ├── README.md                    # Tools 目录说明
+    ├── timestamp_converter.py       # 时间戳 ↔ 日期 转换工具
+    └── json_tool/                   # JSON 处理工具
+        ├── README.md
+        ├── json_tool.py
+        ├── json_data                # 输入文件（粘贴原始数据）
+        └── json_result              # 输出文件（处理结果）
 ```
 
-## 功能模块
+## 功能速览
 
-### 1. JSON 工具 (`tools/json_tool/json_tool.py`)
-
-一个功能丰富的JSON处理工具，主要用于日志分析和数据处理，主要功能包括：
-
-- **格式化（美化）**: 美化JSON结构以便阅读
-- **压缩（最小化）**: 移除不必要的空白字符
-- **转义/去转义**: 处理特殊字符转义序列
-- **Unicode解码**: 将 `\uXXXX` 格式的Unicode字符解码为中文等字符
-- **URL解码**: 解码URL编码的字符
-- **自动修复**: 尝试修复不完整或结构有问题的JSON数据
-- **注释剥离**: 剥离JSON中的注释（支持 `//` 和 `/* */`）
-
-#### 使用方法
-将数据放入 `tools/json_tool/json_data` 文件，运行 `json_tool.py`，结果将保存在 `json_result` 文件中。
-
-### 2. 时间戳转换工具 (`tools/timestamp_converter.py`)
-
-一个强大的时间戳和日期字符串相互转换工具，主要功能包括：
-
-- **时间戳转日期**: 自动识别秒级/毫秒级时间戳并转换为格式化日期字符串
-- **日期转时间戳**: 将日期字符串转换为毫秒时间戳
-- **支持多种格式**: 自动匹配常用日期格式
-- **时区支持**: 支持指定时区转换
-- **常用格式**: 包括 `%Y-%m-%d %H:%M:%S.%f`（精确到毫秒）等
-
-### 3. AI 测试用例生成器 (`skills/ai-testcase/SKILL.md`)
-
-一个AI驱动的测试用例生成系统，支持：
-
-- **文档解析**: 深度解析需求文档、技术文档和核心用例
-- **黑盒测试方法**: 智能选择黑盒测试方法生成测试用例
-- **XMind兼容**: 生成结构化的XMind兼容格式测试用例
-- **多种测试类型**: 支持后端逻辑类、配置类、数据类、前端交互类、集成类等测试
-- **智能分析**: 自动分析条件维度、生成判定表、覆盖各种场景
-
-## 项目特点
-
-1. **模块化设计**: 每个工具都是相对独立的功能模块
-2. **实用性强**: 针对日常开发中常见需求设计
-3. **文档完善**: 每个工具都有详细的文档和使用说明
-4. **自动化处理**: 支持自动识别数据类型并相应处理
-5. **鲁棒性**: 对错误数据有较好的容错和修复能力
+| 组件 | 类型 | 用途 |
+|------|------|------|
+| [ai-testcase](skills/ai-testcase/README.md) | 技能 | 解析需求/技术文档，生成 XMind 兼容的结构化测试用例 |
+| [naming-convention](skills/naming-convention/README.md) | 技能 | 审查命名规范，提供新组件命名建议 |
+| [timestamp_converter](tools/README.md#timestamp_converter) | 工具 | 时间戳与日期字符串双向转换，支持多格式与时区 |
+| [json_tool](tools/json_tool/README.md) | 工具 | JSON 格式化、修复、转义/反转义、Unicode/URL 解码 |
 
 ## 技术栈
 
-- Python 3.x
-- 标准库模块（datetime, json, urllib.parse, re等）
+- Python 3.x，仅使用标准库（`datetime`、`json`、`re`、`urllib.parse`）
+- Claude Code 技能系统
 
 ## 作者
 
