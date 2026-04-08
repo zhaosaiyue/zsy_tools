@@ -391,14 +391,29 @@ tags: [测试, 测试用例, QA, case]
 
 **无剩余模块（全部完成）：**
 
+全部模块写入 `.md` 后，立即执行步骤 D。
+
+### 步骤 D：生成 .xmind 文件
+
+先用 `Glob` 工具定位转换脚本（pattern: `**/ai-testcase/md2xmind.js`），然后用 `Bash` 执行：
+
+```bash
+node {md2xmind.js的绝对路径} "{绝对路径}/testcases_{YYYY-MM-DD}.md"
+```
+
+- 成功后输出 `.xmind` 文件与 `.md` 同目录、同名
+- 若 node 不可用或脚本报错，跳过此步骤并在汇总中提示用户手动转换
+
+输出汇总：
+
 ```
 🎉 完成！
 
-输出文件：{绝对路径}/testcases_{YYYY-MM-DD}.md（共 {N} 条）
+输出文件：
+  {绝对路径}/testcases_{YYYY-MM-DD}.md（共 {N} 条）
+  {绝对路径}/testcases_{YYYY-MM-DD}.xmind（双击直接用 XMind 打开）
 模块统计：{模块1}({n}条) / {模块2}({n}条) / ...
 方法统计：等价类 {N} 条 | 边界值 {N} 条 | 错误推测 {N} 条 | 其他 {N} 条
-
-XMind 导入：文件 → 导入 → Markdown → 选择文件
 ```
 
 **有剩余模块（分批场景）：**
@@ -455,6 +470,7 @@ XMind 导入：文件 → 导入 → Markdown → 选择文件
       → 步骤 A：断点检测（Read 文件 → 判断续传/新建）
       → 步骤 B：逐模块循环（[条件分析] → 生成 → 窗口输出 → Edit 追加，每模块独立）
       → 步骤 C：完成汇总
+      → 步骤 D：生成 .xmind 文件（Bash 调用 md2xmind.js）
 ```
 
 > 输入 `直接出` / `全自动` 跳过所有 [确认]，连续执行至完成。
