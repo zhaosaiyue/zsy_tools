@@ -9,6 +9,7 @@ JSON 工具
   5. Unicode 解码  —— \\uXXXX → 中文
   6. URL 解码
   7. 自动修复 —— 去转义后解析失败时，在不修改数据的前提下尝试补全结构
+  8. 深度解包 —— 递归展开字符串字段中的内嵌 JSON
 
 author: zsy
 """
@@ -223,6 +224,52 @@ def _repair(text: str) -> tuple[str, str] | tuple[None, str]:
     return None, '无法自动修复，请检查数据格式'
 
 
+# ════════════════════════════════════════════════════════════
+#  深度解包
+# ════════════════════════════════════════════════════════════
+
+_MAX_DEPTH = 32
+
+
+def deep_unwrap(obj, _depth: int = 0) -> tuple[any, int]:
+    """
+    递归遍历 dict/list，将值为内嵌 JSON 字符串的字段替换为解析后的对象。
+    返回 (新对象, 展开字段数)。不修改原始对象。
+    """
+    if _depth > _MAX_DEPTH:
+        return obj, 0
+
+    if isinstance(obj, dict):
+        new_dict = {}
+        count = 0
+        for k, v in obj.items():
+            new_v, c = deep_unwrap(v, _depth + 1)
+            new_dict[k] = new_v
+            count += c
+        return new_dict, count
+
+    if isinstance(obj, list):
+        new_list = []
+        count = 0
+        for item in obj:
+            new_item, c = deep_unwrap(item, _depth + 1)
+            new_list.append(new_item)
+            count += c
+        return new_list, count
+
+    if isinstance(obj, str):
+        s = obj.strip()
+        if s and s[0] in ('{', '['):
+            parsed = _try_parse(s)
+            if parsed is not None:
+                # 对解析结果继续递归
+                unwrapped, c = deep_unwrap(parsed, _depth + 1)
+                return unwrapped, c + 1
+        return obj, 0
+
+    return obj, 0
+
+
 def unescape_and_fmt(text: str, indent: int = 2) -> str:
     """
     去转义 → 尝试格式化，失败则尝试修复后再格式化。
@@ -288,7 +335,7 @@ def _try_fmt(text: str, steps: list, indent: int = 2, allow_extract: bool = Fals
     return None
 
 
-def auto(text: str, indent: int = 2) -> tuple[str, bool]:
+def auto(text: str, indent: int = 2, deep: bool = True) -> tuple[str, bool]:
     """
     自动识别数据类型并处理，识别顺序：
       1. URL 编码      → 解码后继续
@@ -297,6 +344,7 @@ def auto(text: str, indent: int = 2) -> tuple[str, bool]:
       4. 含转义序列    → 去转义后尝试格式化（含自动修复，不截断数据）
       5. 兜底          → 转换失败，返回 (原文, False)
 
+    deep=True（默认）：解析成功后对所有字符串字段递归尝试展开内嵌 JSON。
     返回 (结果文本, 是否成功转换为合法JSON)
     """
     steps: list[str] = []
@@ -310,6 +358,7 @@ def auto(text: str, indent: int = 2) -> tuple[str, bool]:
     # Step 2：直接是合法 JSON（允许从日志前后缀中提取片段）
     result = _try_fmt(val, steps, indent, allow_extract=True)
     if result is not None:
+        result = _apply_deep_unwrap(result, steps, indent, deep)
         _print_steps(steps)
         return result, True
 
@@ -319,6 +368,7 @@ def auto(text: str, indent: int = 2) -> tuple[str, bool]:
         steps_copy = steps + ["Unicode解码"]
         result = _try_fmt(decoded, steps_copy, indent, allow_extract=False)
         if result is not None:
+            result = _apply_deep_unwrap(result, steps_copy, indent, deep)
             _print_steps(steps_copy)
             return result, True
 
@@ -328,6 +378,7 @@ def auto(text: str, indent: int = 2) -> tuple[str, bool]:
         steps.append("去转义")
         result = _try_fmt(unescaped, steps, indent, allow_extract=False)
         if result is not None:
+            result = _apply_deep_unwrap(result, steps, indent, deep)
             _print_steps(steps)
             return result, True
 
@@ -335,6 +386,19 @@ def auto(text: str, indent: int = 2) -> tuple[str, bool]:
     steps.append("无法识别为合法JSON")
     _print_steps(steps)
     return val, False
+
+
+def _apply_deep_unwrap(json_str: str, steps: list, indent: int, deep: bool) -> str:
+    """解析后对象做深度解包，并在 steps 里追加提示。"""
+    if not deep:
+        return json_str
+    obj = _try_parse(json_str)
+    if obj is None:
+        return json_str
+    unwrapped, count = deep_unwrap(obj)
+    if count > 0:
+        steps.append(f"深度解包({count}处)")
+    return json.dumps(unwrapped, ensure_ascii=False, indent=indent)
 
 
 def _print_steps(steps: list[str]) -> None:

@@ -1,5 +1,30 @@
 {
-  "premisesType": "special",
-  "premisesTypeMemo": "特殊楼盘",
-  "premisesId": 9001
+  "msg_local_id": 0,
+  "from_ucid": "SYSTEM",
+  "msg_payload": {
+    "cardID": 7,
+    "desc": "您收到一条消息，请点击查看",
+    "forwardable": false,
+    "nativeScheme": "",
+    "uiModel": {
+      "button": {
+        "action": "http://test-sign2b-m.lianjia.com/refundCheck/detail?requestType=2&requestId=6623722&isShenhe=true",
+        "text": "去审批",
+        "textColor": "#00b300"
+      },
+      "content3_title": "合同编号：",
+      "content1_value": "6623722",
+      "content1_title": "申请ID：",
+      "content3_value": "D200000000210",
+      "title": "您有待审批的财务申请，请点击查看",
+      "content2_title": "经纪人：",
+      "content2_value": "西尾貴"
+    },
+    "webScheme": "",
+    "withdraw": true
+  },
+  "to_ucid": 1000000030048751,
+  "conv_type": 3,
+  "members": "LINK_QIANYUEJUHE,1000000030048751",
+  "msg_type": 331
 }
