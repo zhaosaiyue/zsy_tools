@@ -8,23 +8,23 @@
     "nativeScheme": "",
     "uiModel": {
       "button": {
-        "action": "http://test-sign2b-m.lianjia.com/refundCheck/detail?requestType=2&requestId=6623722&isShenhe=true",
+        "action": "http://test-sign2b-m.lianjia.com/refundCheck/detail?requestType=2&requestId=6623725&isShenhe=true",
         "text": "去审批",
         "textColor": "#00b300"
       },
       "content3_title": "合同编号：",
-      "content1_value": "6623722",
+      "content1_value": "6623725",
       "content1_title": "申请ID：",
-      "content3_value": "D200000000210",
+      "content3_value": "000000047973",
       "title": "您有待审批的财务申请，请点击查看",
       "content2_title": "经纪人：",
-      "content2_value": "西尾貴"
+      "content2_value": "赵赛月"
     },
     "webScheme": "",
     "withdraw": true
   },
-  "to_ucid": 1000000030048751,
+  "to_ucid": 1000000020082482,
   "conv_type": 3,
-  "members": "LINK_QIANYUEJUHE,1000000030048751",
+  "members": "LINK_QIANYUEJUHE,1000000020082482",
   "msg_type": 331
 }
