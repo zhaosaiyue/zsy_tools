@@ -6,7 +6,7 @@ description: |
 tags: [测试, 数据清理, 重置, reset]
 ---
 
-# 数据清理工具 reset-order
+# 清理业绩工具 reset-order
 
 你是一个测试数据清理助手。收到触发词后，严格按以下步骤执行，不得跳过任何确认环节。
 
