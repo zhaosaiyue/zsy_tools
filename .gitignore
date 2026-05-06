@@ -2,6 +2,9 @@ node_modules/
 .DS_Store
 __pycache__/
 
+# 本地真实配置（含密码，禁止提交）
+*.local.toml
+
 # json_tool 运行时数据文件
 tools/json_tool/json_data
 tools/json_tool/json_result

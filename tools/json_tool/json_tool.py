@@ -93,22 +93,27 @@ def escape(text: str) -> str:
 
 def unescape(text: str) -> str:
     """
-    去转义：还原 \\" → "  \\\\ → \\  \\n \\t \\r 等控制字符
-    不解析 JSON，仅做字符串层面还原，绝对不修改数据内容。
+    去转义：仅还原 \\" → " 和 \\\\ → \\，其余转义序列（\\n \\t \\uXXXX 等）
+    保持原样，留给后续 JSON 解析器处理。
+    这样去转义后的文本可直接作为合法 JSON 文本再次解析，不会产生裸控制字符。
     """
-    # 用 json.loads 解码字符串转义序列，包两层引号使其成为合法 JSON 字符串
-    try:
-        return json.loads(f'"{text}"')
-    except json.JSONDecodeError:
-        # 手动处理常见转义，避免因非标准转义导致失败
-        return (
-            text
-            .replace('\\"', '"')
-            .replace("\\\\", "\\")
-            .replace("\\n", "\n")
-            .replace("\\t", "\t")
-            .replace("\\r", "\r")
-        )
+    result = []
+    i = 0
+    while i < len(text):
+        if text[i] == '\\' and i + 1 < len(text):
+            nxt = text[i + 1]
+            if nxt == '"':
+                result.append('"')
+                i += 2
+                continue
+            elif nxt == '\\':
+                result.append('\\')
+                i += 2
+                continue
+            # \n \t \r \b \f \uXXXX 等保留为转义序列，JSON 解析器会正确处理
+        result.append(text[i])
+        i += 1
+    return ''.join(result)
 
 
 def decode_unicode(text: str) -> str:
@@ -148,40 +153,48 @@ def _extract_json(text: str) -> tuple[str, str] | tuple[None, None]:
     返回 (json字符串, 提取说明) 或 (None, None)
     """
     for start_char, end_char in [('{', '}'), ('[', ']')]:
-        start = text.find(start_char)
-        if start == -1:
-            continue
-        depth = 0
-        in_string = False
-        escape_next = False
-        for i, ch in enumerate(text[start:], start):
-            if escape_next:
-                escape_next = False
-                continue
-            if ch == '\\' and in_string:
-                escape_next = True
-                continue
-            if ch == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if ch == start_char:
-                depth += 1
-            elif ch == end_char:
-                depth -= 1
-                if depth == 0:
-                    candidate = text[start:i + 1]
-                    if _try_parse(candidate) is not None:
-                        prefix = text[:start].strip(', \t\n')
-                        suffix = text[i + 1:].strip(', \t\n')
-                        note = "提取JSON片段"
-                        if prefix:
-                            note += f"（忽略前缀: {prefix[:30]}{'...' if len(prefix) > 30 else ''}）"
-                        if suffix:
-                            note += f"（忽略后缀: {suffix[:30]}{'...' if len(suffix) > 30 else ''}）"
-                        return candidate, note
-                    break
+        pos = 0
+        while True:
+            start = text.find(start_char, pos)
+            if start == -1:
+                break
+            depth = 0
+            in_string = False
+            escape_next = False
+            found_end = -1
+            for i, ch in enumerate(text[start:], start):
+                if escape_next:
+                    escape_next = False
+                    continue
+                if ch == '\\' and in_string:
+                    escape_next = True
+                    continue
+                if ch == '"':
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if ch == start_char:
+                    depth += 1
+                elif ch == end_char:
+                    depth -= 1
+                    if depth == 0:
+                        found_end = i
+                        break
+            if found_end == -1:
+                break
+            candidate = text[start:found_end + 1]
+            if _try_parse(candidate) is not None:
+                prefix = text[:start].strip(', \t\n')
+                suffix = text[found_end + 1:].strip(', \t\n')
+                note = "提取JSON片段"
+                if prefix:
+                    note += f"（忽略前缀: {prefix[:30]}{'...' if len(prefix) > 30 else ''}）"
+                if suffix:
+                    note += f"（忽略后缀: {suffix[:30]}{'...' if len(suffix) > 30 else ''}）"
+                return candidate, note
+            # 当前起点的候选无效，从下一个位置继续搜索
+            pos = start + 1
     return None, None
 
 
@@ -314,24 +327,24 @@ def _fmt_obj(obj, indent: int = 2) -> str:
 
 
 def _try_fmt(text: str, steps: list, indent: int = 2, allow_extract: bool = False) -> str | None:
-    """尝试直接解析 → （可选）提取片段 → 修复 → 格式化，成功返回字符串，失败返回 None"""
+    """尝试直接解析 → 结构修复 → （可选）提取片段 → 格式化，成功返回字符串，失败返回 None"""
     obj = _try_parse(text)
     if obj is not None:
         steps.append("格式化")
         return _fmt_obj(obj, indent)
-    # 尝试从含日志前后缀的文本中提取 JSON（仅在明确允许时使用，避免截断数据）
+    # 先尝试结构修复（补首尾括号），避免 extract 截断数据
+    repaired, note = _repair(text)
+    if repaired is not None:
+        steps.append(f"自动修复({note})")
+        steps.append("格式化")
+        return _fmt_obj(_try_parse(repaired), indent)
+    # 修复失败再尝试从日志前后缀中提取 JSON 片段
     if allow_extract:
         extracted, note = _extract_json(text)
         if extracted is not None:
             steps.append(note)
             steps.append("格式化")
             return _fmt_obj(_try_parse(extracted), indent)
-    # 尝试结构修复
-    repaired, note = _repair(text)
-    if repaired is not None:
-        steps.append(f"自动修复({note})")
-        steps.append("格式化")
-        return _fmt_obj(_try_parse(repaired), indent)
     return None
 
 
@@ -356,7 +369,9 @@ def auto(text: str, indent: int = 2, deep: bool = True) -> tuple[str, bool]:
         steps.append("URL解码")
 
     # Step 2：直接是合法 JSON（允许从日志前后缀中提取片段）
-    result = _try_fmt(val, steps, indent, allow_extract=True)
+    # 含转义序列时禁用 extract，避免误匹配转义文本中的括号
+    allow_extract = not _has_escape(val)
+    result = _try_fmt(val, steps, indent, allow_extract=allow_extract)
     if result is not None:
         result = _apply_deep_unwrap(result, steps, indent, deep)
         _print_steps(steps)
@@ -372,15 +387,21 @@ def auto(text: str, indent: int = 2, deep: bool = True) -> tuple[str, bool]:
             _print_steps(steps_copy)
             return result, True
 
-    # Step 4：含转义序列（\" \n \t 等）
+    # Step 4：含转义序列（\" \n \t 等），支持多层嵌套转义
     if _has_escape(val):
-        unescaped = unescape(val)
-        steps.append("去转义")
-        result = _try_fmt(unescaped, steps, indent, allow_extract=False)
-        if result is not None:
-            result = _apply_deep_unwrap(result, steps, indent, deep)
-            _print_steps(steps)
-            return result, True
+        current = val
+        layer = 0
+        while _has_escape(current) and layer < 5:
+            current = unescape(current)
+            layer += 1
+            step_label = "去转义" if layer == 1 else f"去转义x{layer}"
+            steps_attempt = steps + [step_label]
+            # 去转义后允许提取（处理"日志前缀 + 转义JSON"场景）
+            result = _try_fmt(current, steps_attempt, indent, allow_extract=True)
+            if result is not None:
+                result = _apply_deep_unwrap(result, steps_attempt, indent, deep)
+                _print_steps(steps_attempt)
+                return result, True
 
     # Step 5：兜底 → 转换失败
     steps.append("无法识别为合法JSON")

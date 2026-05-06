@@ -1,0 +1,17 @@
+# 配置模板，说明所有可用字段，不填写真实值，可安全提交 Git。
+# 首次使用时，复制本文件为 reset_order.local.toml，填入真实连接信息即可。
+#   cp config.example.toml reset_order.local.toml
+
+[db_betula]
+host = ""
+port = 3306
+user = ""
+password = ""
+database = "cashcow_betula"
+
+[db_contribute]
+host = ""
+port = 3306
+user = ""
+password = ""
+database = "sign_contribute"
