@@ -42,7 +42,7 @@ def get_all_tables(order_no: int) -> dict:
     return {base: get_table_name(base, order_no) for base in SHARD_CONFIG}
 
 
-DEFAULT_ORDER_NO = 6609633165313056768
+DEFAULT_ORDER_NO = 6585951162319339521
 
 if __name__ == "__main__":
     import sys
