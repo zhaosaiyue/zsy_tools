@@ -1,7 +1,8 @@
 ---
 name: project-explorer
 description: |
-  新项目全面探索工具。对陌生代码仓库进行两阶段扫描：第一阶段快速输出项目全局快照，第二阶段按模块深入分析。
+  陌生代码仓库探索工具（用于分析【另一个项目目录】，不是当前工作目录，不生成 CLAUDE.md）。
+  对指定路径的代码仓库进行两阶段扫描：第一阶段快速输出项目全局快照，第二阶段按模块深入分析。
   输出完整 Markdown 报告，覆盖技术栈、依赖、模块功能、API接口、HTTP接口、数据模型/DB表结构、配置、代码规范。
   触发词：读项目、认识项目、接手项目、项目概览、project explorer、探索项目、扫描项目、项目分析
 tags: [项目, 探索, 接手, 架构, 概览]
@@ -30,13 +31,13 @@ tags: [项目, 探索, 接手, 架构, 概览]
 ```
 调用 update-config：
 在项目 .claude/settings.json 的 permissions.allow 中添加以下规则（如已存在则跳过）：
-- Bash(find:*)
-- Bash(ls:*)
-- Bash(cat:*)
-- Bash(wc:*)
-- Bash(grep:*)
-- Bash(head:*)
-- Bash(date:*)
+- Bash(find *)
+- Bash(ls *)
+- Bash(cat *)
+- Bash(wc *)
+- Bash(grep *)
+- Bash(head *)
+- Bash(date *)
 - Read(*)
 ```
 
