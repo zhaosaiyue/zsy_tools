@@ -1,0 +1,10 @@
+# 配置模板，不填写真实值，可安全提交 Git。
+# 首次使用：复制本文件为 bsu_amount.local.toml，填入真实连接信息。
+#   cp config.example.toml bsu_amount.local.toml
+
+[db_pinus]
+host = ""
+port = 3306
+user = ""
+password = ""
+database = "ke_pinus"
