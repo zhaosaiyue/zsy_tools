@@ -2,17 +2,18 @@
 kafka_tool.py  —  Kafka 消息发送工具
 
 用法：
-  python kafka_tool.py --topic finance_performance_perf_change --message '{"orderNo":"123"}'
-  python kafka_tool.py --topic xxx --file /tmp/msg.json
-  python kafka_tool.py --topic xxx --key "orderNo" --message '{"orderNo":"123"}'
-  python kafka_tool.py --topic xxx --header traceId=abc --header source=test --message '{...}'
-  python kafka_tool.py --config ~/other_cluster.toml --topic xxx --message '{...}'
-  python kafka_tool.py --message '{"orderNo":"123"}'   # 使用配置里的 default_topic
+  python kafka_tool.py                          # 读 kafka_data，自动取 #profile 行
+  python kafka_tool.py --profile zhuangke       # 指定 profile
+  python kafka_tool.py --topic xxx --message '{...}'  # 临时覆盖 topic 和消息体
+  python kafka_tool.py --check-offset           # 查消费进度
+  python kafka_tool.py --check-members          # 查哪些服务实例在消费
+  python kafka_tool.py --list-profiles          # 列出所有可用 profile
 """
 
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 try:
@@ -29,26 +30,20 @@ except ImportError:
 
 
 _SCRIPT_DIR = Path(__file__).parent
+_DATA_FILE = _SCRIPT_DIR / "kafka_data"
 _CONFIG_CANDIDATES = [
     _SCRIPT_DIR / "kafka_tool.local.toml",
     Path.home() / ".zsy_tools" / "kafka_tool.toml",
 ]
 
 
-def load_config(config_path: str | None) -> dict:
-    if config_path:
-        p = Path(config_path).expanduser()
-        if not p.exists():
-            print(f"[错误] 指定的配置文件不存在：{p}")
-            sys.exit(1)
-        with open(p, "rb") as f:
-            return tomllib.load(f)
+# ── 配置加载 ──────────────────────────────────────────────
 
+def load_config() -> dict:
     for path in _CONFIG_CANDIDATES:
         if path.exists():
             with open(path, "rb") as f:
                 return tomllib.load(f)
-
     print("[错误] 未找到配置文件，请创建以下任意一个：")
     for p in _CONFIG_CANDIDATES:
         print(f"  {p}")
@@ -56,49 +51,78 @@ def load_config(config_path: str | None) -> dict:
     sys.exit(1)
 
 
-def build_producer(cfg: dict) -> KafkaProducer:
-    servers = [s.strip() for s in cfg["bootstrap_servers"].split(",")]
-    protocol = cfg.get("security_protocol", "PLAINTEXT").upper()
-    timeout = cfg.get("request_timeout_ms", 10000)
+def resolve_profile(raw: dict, profile_name: str | None) -> dict:
+    """common + 指定 profile 合并，profile 同名字段优先。"""
+    profiles = raw.get("profiles", {})
+    common = raw.get("common", {})
 
-    kwargs = {
-        "bootstrap_servers": servers,
-        "security_protocol": protocol,
-        "request_timeout_ms": timeout,
-        "value_serializer": lambda v: v.encode("utf-8") if isinstance(v, str) else v,
-        "key_serializer": lambda k: k.encode("utf-8") if isinstance(k, str) else k,
-    }
+    if not profiles:
+        return raw
 
-    mechanism = cfg.get("sasl_mechanism", "").strip()
-    if mechanism:
-        kwargs["sasl_mechanism"] = mechanism
-        kwargs["sasl_plain_username"] = cfg.get("sasl_username", "")
-        kwargs["sasl_plain_password"] = cfg.get("sasl_password", "")
+    if profile_name:
+        if profile_name not in profiles:
+            print(f"[错误] profile '{profile_name}' 不存在，可用的有：{list(profiles.keys())}")
+            sys.exit(1)
+    else:
+        profile_name = next(iter(profiles))
 
-    return KafkaProducer(**kwargs)
+    cfg = {**common, **profiles[profile_name]}
+    cfg["_profile"] = profile_name
+    return cfg
 
 
-_DATA_FILE = _SCRIPT_DIR / "kafka_data"
+# ── kafka_data 解析 ───────────────────────────────────────
+
+def read_data_file() -> tuple[str | None, str]:
+    """
+    读取 kafka_data，解析第一行的 #profile: xxx 指令。
+    返回 (profile_name_or_None, 消息体)
+    """
+    if not _DATA_FILE.exists() or not _DATA_FILE.read_text(encoding="utf-8").strip():
+        print(f"[提示] 请将消息体写入 {_DATA_FILE}")
+        sys.exit(1)
+
+    content = _DATA_FILE.read_text(encoding="utf-8")
+    lines = content.splitlines()
+
+    profile = None
+    msg_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("#profile:"):
+            profile = stripped[len("#profile:"):].strip()
+        else:
+            msg_lines.append(line)
+
+    return profile, "\n".join(msg_lines).strip()
 
 
-def parse_message(args) -> str:
+# ── 消息解析 ──────────────────────────────────────────────
+
+def parse_message(args, cfg: dict) -> str:
+    """
+    消息体优先级：--message > --file > profile.message > kafka_data 消息体
+    """
     if args.message and args.file:
         print("[错误] --message 和 --file 不能同时使用")
         sys.exit(1)
 
-    if args.file:
+    if args.message:
+        raw = args.message.strip()
+    elif args.file:
         p = Path(args.file).expanduser()
         if not p.exists():
             print(f"[错误] 文件不存在：{p}")
             sys.exit(1)
         raw = p.read_text(encoding="utf-8").strip()
-    elif args.message:
-        raw = args.message.strip()
+    elif cfg.get("message", "").strip():
+        raw = cfg["message"].strip()
+        print(f"[kafka-tool] 读取消息体来自配置文件 profile")
     else:
-        if not _DATA_FILE.exists() or not _DATA_FILE.read_text(encoding="utf-8").strip():
-            print(f"[提示] 请将消息体粘贴到 {_DATA_FILE}，或使用 --message / --file 参数")
+        _, raw = read_data_file()
+        if not raw:
+            print(f"[提示] 请在配置文件 profile 里填 message，或将消息体写入 {_DATA_FILE}")
             sys.exit(1)
-        raw = _DATA_FILE.read_text(encoding="utf-8").strip()
         print(f"[kafka-tool] 读取消息体来自 kafka_data")
 
     try:
@@ -109,8 +133,26 @@ def parse_message(args) -> str:
     return raw
 
 
+# ── Kafka 工具 ────────────────────────────────────────────
+
+def build_producer(cfg: dict) -> KafkaProducer:
+    servers = [s.strip() for s in cfg["bootstrap_servers"].split(",")]
+    kwargs = {
+        "bootstrap_servers": servers,
+        "security_protocol": cfg.get("security_protocol", "PLAINTEXT").upper(),
+        "request_timeout_ms": cfg.get("request_timeout_ms", 10000),
+        "value_serializer": lambda v: v.encode("utf-8") if isinstance(v, str) else v,
+        "key_serializer": lambda k: k.encode("utf-8") if isinstance(k, str) else k,
+    }
+    mechanism = cfg.get("sasl_mechanism", "").strip()
+    if mechanism:
+        kwargs["sasl_mechanism"] = mechanism
+        kwargs["sasl_plain_username"] = cfg.get("sasl_username", "")
+        kwargs["sasl_plain_password"] = cfg.get("sasl_password", "")
+    return KafkaProducer(**kwargs)
+
+
 def parse_headers(header_args: list[str]) -> list[tuple[str, bytes]]:
-    """解析 key=value 格式的 header 列表"""
     headers = []
     for h in (header_args or []):
         if "=" not in h:
@@ -122,10 +164,8 @@ def parse_headers(header_args: list[str]) -> list[tuple[str, bytes]]:
 
 
 def check_members(cfg: dict, group: str):
-    """查询当前 consumer group 里有哪些消费者实例在线（显示 IP/host）"""
     servers = [s.strip() for s in cfg["bootstrap_servers"].split(",")]
     admin = KafkaAdminClient(bootstrap_servers=servers)
-
     try:
         described = admin.describe_consumer_groups([group])
     finally:
@@ -137,18 +177,15 @@ def check_members(cfg: dict, group: str):
 
     group_info = described[0]
     members = group_info.members
-
     print(f"\n── consumer group 成员 ───────────────────────────")
     print(f"  消费者组：{group}")
     print(f"  状态    ：{group_info.state}")
     print(f"  成员数  ：{len(members)} 个")
     print(f"──────────────────────────────────────────────────")
-
     if not members:
         print("  （当前没有在线的消费者）")
     else:
         for i, m in enumerate(members, 1):
-            # client_id 通常包含服务名+host，host 是连接来源 IP
             print(f"  [{i}] host      : {m.client_host}")
             print(f"      client_id : {m.client_id}")
             print(f"      member_id : {m.member_id[:40]}...")
@@ -157,20 +194,12 @@ def check_members(cfg: dict, group: str):
 
 
 def check_offset(cfg: dict, topic: str, group: str):
-    """
-    查询消费者进度。
-    Kafka 每个 topic 分成若干个"分区（partition）"存消息，每条消息有一个编号（offset）。
-    消费者每次读完一批消息后，会记录自己读到哪了（committed offset）。
-    LAG = 队列最新编号 - 消费者读到的编号，LAG=0 表示没有积压，消息都被消费了。
-    """
     servers = [s.strip() for s in cfg["bootstrap_servers"].split(",")]
-
     consumer = KafkaConsumer(
         bootstrap_servers=servers,
         group_id=group,
         enable_auto_commit=False,
     )
-
     partitions = consumer.partitions_for_topic(topic)
     if not partitions:
         print(f"[错误] topic 不存在或无法访问：{topic}")
@@ -179,7 +208,6 @@ def check_offset(cfg: dict, topic: str, group: str):
 
     tps = [TopicPartition(topic, p) for p in sorted(partitions)]
     consumer.assign(tps)
-
     end_offsets = consumer.end_offsets(tps)
     committed = {tp: consumer.committed(tp) for tp in tps}
     consumer.close()
@@ -198,13 +226,11 @@ def check_offset(cfg: dict, topic: str, group: str):
         com_str = str(com) if com is not None else "（未提交）"
         lag = (latest - com) if com is not None else "?"
         total_lag += lag if isinstance(lag, int) else 0
-        lag_str = str(lag) if lag != 0 else "0 ✅"
+        lag_str = "0 ✅" if lag == 0 else str(lag)
         print(f"  {tp.partition:<6} {com_str:<12} {latest:<12} {lag_str}")
 
     print(f"  {'-'*46}")
-    print(f"  总积压：{total_lag} 条")
-
-    print()
+    print(f"  总积压：{total_lag} 条\n")
     if total_lag == 0:
         print("  结论：消息已被消费者拉走（LAG=0）")
         print("         但消费者代码里可能没打日志，或走了某个分支直接返回了")
@@ -215,22 +241,44 @@ def check_offset(cfg: dict, topic: str, group: str):
     print()
 
 
+# ── main ──────────────────────────────────────────────────
+
 def main():
     parser = argparse.ArgumentParser(description="Kafka 消息发送工具")
-    parser.add_argument("--topic",   help="目标 topic（不传则使用配置里的 default_topic）")
-    parser.add_argument("--message", help="消息内容（JSON 字符串）")
-    parser.add_argument("--file",    help="从文件读取消息内容")
-    parser.add_argument("--key",     help="消息 key（可选，用于分区路由）")
-    parser.add_argument("--header",  dest="headers", action="append",
+    parser.add_argument("--profile",       help="指定 profile 名（不传则读 kafka_data 第一行，或用第一个）")
+    parser.add_argument("--topic",         help="临时覆盖 topic")
+    parser.add_argument("--message",       help="消息内容（JSON 字符串）")
+    parser.add_argument("--file",          help="从文件读取消息内容")
+    parser.add_argument("--key",           help="消息 key（可选，用于分区路由）")
+    parser.add_argument("--header",        dest="headers", action="append",
                         metavar="KEY=VALUE", help="消息 header，可多次指定")
-    parser.add_argument("--config",       help="指定配置文件路径（默认搜索本地 .local.toml）")
-    parser.add_argument("--check-offset", action="store_true",
-                        help="查询消费者 group 的 offset 和 LAG")
-    parser.add_argument("--check-members", action="store_true",
-                        help="查询当前 consumer group 里有哪些消费者实例在线")
+    parser.add_argument("--check-offset",  action="store_true", help="查询消费进度")
+    parser.add_argument("--check-members", action="store_true", help="查询在线消费者实例")
+    parser.add_argument("--list-profiles", action="store_true", help="列出所有可用 profile")
     args = parser.parse_args()
 
-    cfg = load_config(args.config)
+    raw_cfg = load_config()
+
+    # 列出所有 profile
+    if args.list_profiles:
+        profiles = raw_cfg.get("profiles", {})
+        if not profiles:
+            print("（当前配置文件无 profiles，为单配置模式）")
+            return
+        print("\n可用 profile：")
+        for name, p in profiles.items():
+            print(f"  {name:<20} topic={p.get('topic', '')}  group={p.get('consumer_group', '')}")
+        print()
+        return
+
+    # 确定最终 profile（优先级：--profile > kafka_data #profile > 第一个）
+    profile_from_file = None
+    if not args.profile:
+        profile_from_file, _ = read_data_file() if _DATA_FILE.exists() else (None, "")
+    profile_name = args.profile or profile_from_file
+    cfg = resolve_profile(raw_cfg, profile_name)
+
+    print(f"[kafka-tool] 使用 profile: {cfg.get('_profile', '（默认）')}")
 
     if args.check_members:
         group = cfg.get("consumer_group", "")
@@ -240,21 +288,25 @@ def main():
         check_members(cfg, group)
         return
 
+    topic = args.topic or cfg.get("topic", "")
+
     if args.check_offset:
-        topic = args.topic or cfg.get("default_topic", "")
+        if not topic:
+            print("[错误] 请用 --topic 指定 topic，或在配置文件里填 topic")
+            sys.exit(1)
         group = cfg.get("consumer_group", "")
-        if not topic or not group:
-            print("[错误] 需要 topic 和 consumer_group（配置文件里填或用 --topic 指定）")
+        if not group:
+            print("[错误] 需要 consumer_group（配置文件里填）")
             sys.exit(1)
         check_offset(cfg, topic, group)
         return
 
-    topic = args.topic or cfg.get("default_topic", "")
+    # 发送
     if not topic:
-        print("[错误] 未指定 topic，且配置文件中没有 default_topic")
+        print("[错误] 请用 --topic 指定 topic，或在配置文件 profile 里填 topic")
         sys.exit(1)
 
-    message = parse_message(args)
+    message = parse_message(args, cfg)
     headers = parse_headers(args.headers)
 
     servers_display = cfg["bootstrap_servers"].split(",")[0] + (
@@ -292,7 +344,6 @@ def main():
     # 发送后自动检查消费进度
     group = cfg.get("consumer_group", "")
     if group:
-        import time
         print(f"\n[kafka-tool] 等待 2 秒后自动检查消费进度...")
         time.sleep(2)
         check_offset(cfg, topic, group)
