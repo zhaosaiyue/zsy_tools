@@ -2,22 +2,32 @@
 # 首次使用：cp config.example.toml kafka_tool.local.toml，填入真实连接信息。
 # kafka_data 第一行写 #profile: <名字> 来切换场景，不写则用第一个。
 
-[profiles.场景A]
-bootstrap_servers = ""   # 从研发配置 kafka.xxx.servers 里复制，多个用逗号分隔
-topic = ""               # 从研发配置 kafka.xxx.topic 里复制
-consumer_group = ""      # 从研发配置 kafka.xxx.group.id 里复制，用于查消费进度
+# ── 公共配置（认证方式、超时等，所有 profile 共享）──────
+[common]
 security_protocol = "PLAINTEXT"   # 无认证填 PLAINTEXT；有认证填 SASL_PLAINTEXT
-sasl_mechanism = ""      # 有认证时填 PLAIN / SCRAM-SHA-256，无认证留空
+sasl_mechanism = ""               # 有认证时填 PLAIN / SCRAM-SHA-256，无认证留空
 sasl_username = ""
 sasl_password = ""
 request_timeout_ms = 10000
 
-[profiles.场景B]
+# ── 各业务场景（每个场景独立配置 broker、topic、消息体）──
+
+[profiles.scene-a]
+# 场景A（改成你的业务名，如 overdue / zhuangke）
+bootstrap_servers = ""   # 从研发配置 kafka.xxx.servers 里复制，多个用逗号分隔
+topic = ""               # 从研发配置 kafka.xxx.topic 里复制
+consumer_group = ""      # 从研发配置 kafka.xxx.group.id 里复制，用于查消费进度
+message = '''
+{
+}
+'''
+
+[profiles.scene-b]
+# 场景B
 bootstrap_servers = ""
 topic = ""
 consumer_group = ""
-security_protocol = "PLAINTEXT"
-sasl_mechanism = ""
-sasl_username = ""
-sasl_password = ""
-request_timeout_ms = 10000
+message = '''
+{
+}
+'''

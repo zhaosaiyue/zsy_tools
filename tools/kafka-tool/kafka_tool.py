@@ -163,37 +163,32 @@ def parse_headers(header_args: list[str]) -> list[tuple[str, bytes]]:
     return headers
 
 
-def check_members(cfg: dict, group: str):
+def get_members(cfg: dict, group: str) -> list:
+    """返回 consumer group 在线成员列表"""
     servers = [s.strip() for s in cfg["bootstrap_servers"].split(",")]
     admin = KafkaAdminClient(bootstrap_servers=servers)
     try:
         described = admin.describe_consumer_groups([group])
     finally:
         admin.close()
-
     if not described:
-        print(f"[错误] 找不到 group：{group}")
-        return
+        return []
+    return described[0].members
 
-    group_info = described[0]
-    members = group_info.members
-    print(f"\n── consumer group 成员 ───────────────────────────")
-    print(f"  消费者组：{group}")
-    print(f"  状态    ：{group_info.state}")
-    print(f"  成员数  ：{len(members)} 个")
-    print(f"──────────────────────────────────────────────────")
+
+def check_members(cfg: dict, group: str):
+    members = get_members(cfg, group)
     if not members:
-        print("  （当前没有在线的消费者）")
-    else:
-        for i, m in enumerate(members, 1):
-            print(f"  [{i}] host      : {m.client_host}")
-            print(f"      client_id : {m.client_id}")
-            print(f"      member_id : {m.member_id[:40]}...")
-            print()
-    print()
+        print(f"[kafka-tool] 消费者组 {group} 当前没有在线实例")
+        return
+    print(f"[kafka-tool] 消费者组 {group} 共 {len(members)} 个在线实例：")
+    ips = sorted({m.client_host.lstrip("/") for m in members})
+    for ip in ips:
+        print(f"  {ip}")
 
 
-def check_offset(cfg: dict, topic: str, group: str):
+def check_offset(cfg: dict, topic: str, group: str) -> bool:
+    """返回 True 表示 LAG=0（消息已被消费）"""
     servers = [s.strip() for s in cfg["bootstrap_servers"].split(",")]
     consumer = KafkaConsumer(
         bootstrap_servers=servers,
@@ -204,7 +199,7 @@ def check_offset(cfg: dict, topic: str, group: str):
     if not partitions:
         print(f"[错误] topic 不存在或无法访问：{topic}")
         consumer.close()
-        return
+        return False
 
     tps = [TopicPartition(topic, p) for p in sorted(partitions)]
     consumer.assign(tps)
@@ -212,33 +207,12 @@ def check_offset(cfg: dict, topic: str, group: str):
     committed = {tp: consumer.committed(tp) for tp in tps}
     consumer.close()
 
-    print(f"\n── 消费进度查询 ──────────────────────────────────")
-    print(f"  消息队列（topic） : {topic}")
-    print(f"  消费者组（group） : {group}")
-    print(f"──────────────────────────────────────────────────")
-    print(f"  {'分区':<6} {'消费者读到':<12} {'队列最新':<12} {'积压(LAG)'}")
-    print(f"  {'-'*46}")
-
-    total_lag = 0
-    for tp in tps:
-        latest = end_offsets[tp]
-        com = committed[tp]
-        com_str = str(com) if com is not None else "（未提交）"
-        lag = (latest - com) if com is not None else "?"
-        total_lag += lag if isinstance(lag, int) else 0
-        lag_str = "0 ✅" if lag == 0 else str(lag)
-        print(f"  {tp.partition:<6} {com_str:<12} {latest:<12} {lag_str}")
-
-    print(f"  {'-'*46}")
-    print(f"  总积压：{total_lag} 条\n")
-    if total_lag == 0:
-        print("  结论：消息已被消费者拉走（LAG=0）")
-        print("         但消费者代码里可能没打日志，或走了某个分支直接返回了")
-        print("         建议检查消费者入口代码，确认消息内容是否符合处理条件")
-    else:
-        print(f"  结论：消费者还没读到这条消息，积压了 {total_lag} 条")
-        print("         可能原因：消费者服务没启动 / 连的不是同一套 Kafka")
-    print()
+    total_lag = sum(
+        (end_offsets[tp] - committed[tp])
+        for tp in tps
+        if committed[tp] is not None
+    )
+    return total_lag == 0
 
 
 # ── main ──────────────────────────────────────────────────
@@ -298,7 +272,15 @@ def main():
         if not group:
             print("[错误] 需要 consumer_group（配置文件里填）")
             sys.exit(1)
-        check_offset(cfg, topic, group)
+        consumed = check_offset(cfg, topic, group)
+        if consumed:
+            print(f"[kafka-tool] ✅ 消息已被消费")
+            members = get_members(cfg, group)
+            if members:
+                ips = sorted({m.client_host.lstrip("/") for m in members})
+                print(f"[kafka-tool] 消费者 IP：{', '.join(ips)}")
+        else:
+            print(f"[kafka-tool] ⚠️  消息还未被消费（有积压）")
         return
 
     # 发送
@@ -322,7 +304,9 @@ def main():
 
     key_display = f"  key: {args.key}" if args.key else ""
     header_display = f"  headers: {[k for k, _ in headers]}" if headers else ""
-    print(f"[kafka-tool] 发送 → topic: {topic}{key_display}{header_display}")
+    extra = f"{key_display}{header_display}"
+    if extra:
+        print(f"[kafka-tool] 发送中{extra}")
 
     try:
         future = producer.send(
@@ -333,8 +317,8 @@ def main():
         )
         producer.flush()
         record = future.get(timeout=cfg.get("request_timeout_ms", 10000) / 1000)
-        print(f"[kafka-tool] ✅ 消息已发出  分区={record.partition}  编号={record.offset}")
-        print(f"[kafka-tool] 消息已存入 Kafka，等待消费者拉取...")
+        print(f"[kafka-tool] ✅ 发送成功")
+        print(f"[kafka-tool]   消息队列（topic） : {topic}")
     except KafkaError as e:
         print(f"[kafka-tool] ❌ 发送失败：{e}")
         sys.exit(1)
@@ -344,9 +328,15 @@ def main():
     # 发送后自动检查消费进度
     group = cfg.get("consumer_group", "")
     if group:
-        print(f"\n[kafka-tool] 等待 2 秒后自动检查消费进度...")
+        print(f"[kafka-tool]   消费者组（group） : {group}")
         time.sleep(2)
-        check_offset(cfg, topic, group)
+        consumed = check_offset(cfg, topic, group)
+        if consumed:
+            members = get_members(cfg, group)
+            ips = sorted({m.client_host.lstrip("/") for m in members})
+            print(f"[kafka-tool] ✅ 消息已被消费  消费者 IP：{', '.join(ips)}")
+        else:
+            print(f"[kafka-tool] ⚠️  消息还未被消费（有积压）")
 
 
 if __name__ == "__main__":
