@@ -1,0 +1,22 @@
+# 配置模板，可安全提交 Git。
+# 首次使用：cp config.example.toml kafka_tool.local.toml，填入真实连接信息。
+
+# Broker 地址，多个用逗号分隔（从研发配置 kafka.xxx.servers 里复制）
+bootstrap_servers = "kafka11-test.mars.ljnode.com:9092,kafka12-test.mars.ljnode.com:9092,kafka13-test.mars.ljnode.com:9092"
+
+# 默认 topic（命令行 --topic 可覆盖）
+default_topic = "finance_performance_perf_change"
+
+# 消费方 group id（仅供记录参考，发消息不需要）
+consumer_group = "sign-contribute-test"
+
+# 认证方式：PLAINTEXT（无认证）/ SASL_PLAINTEXT / SASL_SSL
+security_protocol = "PLAINTEXT"
+
+# 有认证时填写（PLAINTEXT 时留空即可）
+sasl_mechanism = ""    # PLAIN / SCRAM-SHA-256 / SCRAM-SHA-512
+sasl_username = ""
+sasl_password = ""
+
+# 发送超时（ms）
+request_timeout_ms = 10000

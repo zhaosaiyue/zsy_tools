@@ -8,3 +8,6 @@ __pycache__/
 # json_tool 运行时数据文件
 tools/json_tool/json_data
 tools/json_tool/json_result
+
+# kafka-tool 运行时数据文件
+tools/kafka-tool/kafka_data

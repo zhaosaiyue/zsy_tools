@@ -31,6 +31,7 @@ pip install PyMySQL tomli   # Python < 3.11 需要 tomli；3.11+ 不需要
 python tools/json_tool/json_tool.py       # JSON 格式化/修复
 python tools/timestamp_converter.py       # 时间戳与日期互转
 python tools/pinus_shard.py
+python tools/kafka-tool/kafka_tool.py --topic <topic> --message '<json>'   # 发 Kafka 消息
 ```
 
 ## Architecture
@@ -79,4 +80,5 @@ skills/<skill-name>/
 
 - `skills/reset-order/reset_order.local.toml` — 数据库连接（reset-order）
 - `skills/bsu-amount/bsu_amount.local.toml` — 数据库连接（bsu-amount）
+- `tools/kafka-tool/kafka_tool.local.toml` — Kafka 连接（kafka-tool）
 - 全局备选路径：`~/.zsy_tools/<skill-name>.toml`
