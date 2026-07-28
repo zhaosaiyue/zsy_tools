@@ -1,0 +1,4 @@
+interface:
+  display_name: "敏捷测试文档"
+  short_description: "基于已确认测试用例和飞书母版生成敏捷测试文档与上线结论"
+  default_prompt: "使用 $test-plan 根据我已确认的测试用例，在指定目录生成中文测试文档。"
